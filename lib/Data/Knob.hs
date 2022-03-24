@@ -68,20 +68,20 @@ instance IO.IODevice Device where
 
   seek (Device _ _ var) IO.AbsoluteSeek off = do
     checkOffset off
-    MVar.modifyMVar_ var (\_ -> return (fromInteger off))
+    MVar.modifyMVar var (\_ -> return (fromInteger off, off))
 
   seek (Device _ _ var) IO.RelativeSeek off = do
-    MVar.modifyMVar_ var (\old_off -> do
+    MVar.modifyMVar var (\old_off -> do
       let new_off = toInteger old_off + off
       checkOffset new_off
-      return (fromInteger new_off))
+      return (fromInteger new_off, new_off))
 
   seek dev@(Device _ _ off_var) IO.SeekFromEnd off = do
-    MVar.modifyMVar_ off_var (\_ -> do
+    MVar.modifyMVar off_var (\_ -> do
       size <- IO.getSize dev
       let new_off = size + off
       checkOffset new_off
-      return (fromInteger new_off))
+      return (fromInteger new_off, new_off))
 
   tell (Device _ _ var) = fmap toInteger (MVar.readMVar var)
   getSize (Device _ var _) = do
@@ -111,6 +111,12 @@ setDeviceSize (Device mode bytes_var _) size = checkSize >> setBytes where
   clip bytes = case intSize - Data.ByteString.length bytes of
     padLen | padLen > 0 -> Data.ByteString.append bytes (Data.ByteString.replicate padLen 0)
     _ -> Data.ByteString.take intSize bytes
+
+instance IO.RawIO Device where
+  read             = error "Raw IO is not implemented for knobs"
+  readNonBlocking  = error "Raw IO is not implemented for knobs"
+  write            = error "Raw IO is not implemented for knobs"
+  writeNonBlocking = error "Raw IO is not implemented for knobs"
 
 instance IO.BufferedIO Device where
   newBuffer _ = IO.newByteBuffer 4096
