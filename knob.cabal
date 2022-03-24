@@ -3,13 +3,13 @@ version: 0.1.1
 license: MIT
 license-file: license.txt
 author: John Millikin <jmillikin@gmail.com>
-maintainer: John Millikin <jmillikin@gmail.com>
+maintainer: Naïm Favier <n@monade.li>
 build-type: Simple
-cabal-version: >= 1.6
+cabal-version: >= 1.8
 category: System
 stability: experimental
-homepage: https://john-millikin.com/software/knob/
-bug-reports: mailto:jmillikin@gmail.com
+homepage: https://github.com/ncfavier/knob
+bug-reports: https://github.com/ncfavier/knob/issues
 
 synopsis: Memory-backed handles
 description:
@@ -38,20 +38,15 @@ extra-source-files:
   tests/KnobTests.hs
 
 source-repository head
-  type: bazaar
-  location: https://john-millikin.com/software/knob/
-
-source-repository this
-  type: bazaar
-  location: https://john-millikin.com/branches/knob/0.1/
-  tag: knob_0.1.1
+  type: head
+  location: https://github.com/ncfavier/knob
 
 library
   hs-source-dirs: lib
-  ghc-options: -Wall -O2
+  ghc-options: -Wall
 
   build-depends:
-      base >= 4.2 && < 5.0
+      base >= 4.2 && < 4.15
     , bytestring >= 0.9
     , transformers >= 0.2
 
