@@ -53,7 +53,7 @@ import qualified System.IO as IO
 -- have multiple 'IO.Handle's open to it, each of which behaves like a standard
 -- file handle.
 --
--- Use 'getContents' and 'setContents' to inspect and modify the knob&#8217;s
+-- Use 'Data.Knob.getContents' and 'setContents' to inspect and modify the knob's
 -- byte buffer.
 newtype Knob = Knob (MVar.MVar ByteString)
 
