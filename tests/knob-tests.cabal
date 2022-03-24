@@ -1,0 +1,22 @@
+name: knob-tests
+version: 0
+build-type: Simple
+cabal-version: >= 1.6
+
+flag coverage
+  default: False
+  manual: True
+
+executable knob_tests
+  main-is: KnobTests.hs
+  ghc-options: -Wall
+  hs-source-dirs: ../lib,.
+
+  if flag(coverage)
+    ghc-options: -fhpc
+
+  build-depends:
+      base >= 4.2 && < 5.0
+    , bytestring >= 0.9 && < 0.10
+    , chell >= 0.2 && < 0.3
+    , transformers >= 0.2 && < 0.3

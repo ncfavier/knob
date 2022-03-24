@@ -1,0 +1,23 @@
+#!/bin/bash
+if [ ! -f 'knob.cabal' ]; then
+	echo -n "Can't find knob.cabal; please run this script as"
+	echo -n " ./scripts/run-coverage from within the knob source"
+	echo " directory"
+	exit 1
+fi
+
+. scripts/common.bash
+
+require_cabal_dev
+
+pushd tests
+$CABAL_DEV -s ../cabal-dev install --flags="coverage" || exit 1
+popd
+
+rm -f knob_tests.tix
+cabal-dev/bin/knob_tests $@
+
+EXCLUDES="--exclude=Main"
+
+hpc markup --srcdir=src/ --srcdir=tests/ knob_tests.tix --destdir=hpc-markup $EXCLUDES > /dev/null
+hpc report --srcdir=src/ --srcdir=tests/ knob_tests.tix $EXCLUDES

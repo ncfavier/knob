@@ -1,0 +1,20 @@
+#!/bin/bash
+if [ ! -f 'knob.cabal' ]; then
+	echo -n "Can't find knob.cabal; please run this script as"
+	echo -n " ./scripts/run-tests from within the knob source"
+	echo " directory"
+	exit 1
+fi
+
+. scripts/common.bash
+
+require_cabal_dev
+
+clean_dev_install
+
+pushd tests
+rm -rf dist
+$CABAL_DEV -s ../cabal-dev install || exit 1
+popd
+
+cabal-dev/bin/knob_tests
