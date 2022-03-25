@@ -39,7 +39,7 @@ extra-source-files:
   tests/KnobTests.hs
 
 source-repository head
-  type: head
+  type: git
   location: https://github.com/ncfavier/knob
 
 library
