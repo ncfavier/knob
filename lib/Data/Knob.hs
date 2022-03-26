@@ -5,11 +5,11 @@
 -- Copyright: 2011 John Millikin
 -- License: MIT
 --
--- Maintainer: jmillikin@gmail.com
+-- Maintainer: n@monade.li
 -- Portability: GHC only
 --
--- Create memory&#8208;backed 'IO.Handle's, referencing virtual files. This is
--- mostly useful for testing 'IO.Handle'&#8208;based APIs without having to
+-- Create memory-backed 'IO.Handle's, referencing virtual files. This is
+-- mostly useful for testing 'IO.Handle'-based APIs without having to
 -- interact with the filesystem.
 --
 -- > import Data.ByteString (pack)
