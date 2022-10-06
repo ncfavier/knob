@@ -112,11 +112,34 @@ setDeviceSize (Device mode bytes_var _) size = checkSize >> setBytes where
     padLen | padLen > 0 -> Data.ByteString.append bytes (Data.ByteString.replicate padLen 0)
     _ -> Data.ByteString.take intSize bytes
 
+{- What about non-POSIX environment? -}
 instance IO.RawIO Device where
-  read             = error "Raw IO is not implemented for knobs"
-  readNonBlocking  = error "Raw IO is not implemented for knobs"
-  write            = error "Raw IO is not implemented for knobs"
-  writeNonBlocking = error "Raw IO is not implemented for knobs"
+  read (Device _ bytes_var pos_var) ptr _ bufSize = do
+    MVar.withMVar bytes_var $ \bytes -> do
+      MVar.modifyMVar pos_var $ \pos -> do
+        if pos >= Data.ByteString.length bytes
+          then return (pos, 0)
+          else do
+            let chunk = Data.ByteString.take bufSize (Data.ByteString.drop pos bytes)
+            unsafeUseAsCStringLen chunk $ \(chunkPtr, chunkLen) -> do
+              Foreign.copyArray ptr (Foreign.castPtr chunkPtr) chunkLen
+              return (pos + chunkLen, chunkLen)
+
+  write (Device _ bytes_var pos_var) ptr _ bufSize = do
+    MVar.modifyMVar_ bytes_var $ \bytes -> do
+      MVar.modifyMVar pos_var $ \pos -> do
+        let (before, after) = Data.ByteString.splitAt pos bytes
+        let padding = Data.ByteString.replicate (pos - Data.ByteString.length before) 0
+
+        bufBytes <- Data.ByteString.packCStringLen (Foreign.castPtr ptr, bufSize)
+        let newBytes = Data.ByteString.concat [before, padding, bufBytes, Data.ByteString.drop bufSize after]
+        return (pos + bufSize, newBytes)
+    return ()
+
+  readNonBlocking dev buf off size = IO.read dev buf off size >>= \cnt -> if cnt == 0
+    then return Nothing
+    else return $ Just cnt
+  writeNonBlocking dev buf off cnt = IO.write dev buf off cnt >> return cnt
 
 instance IO.BufferedIO Device where
   newBuffer _ = IO.newByteBuffer 4096
