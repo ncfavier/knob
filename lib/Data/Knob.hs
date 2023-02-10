@@ -26,13 +26,14 @@
 module Data.Knob
   ( Knob
   , newKnob
-  , Device
-  , newDevice
   , Data.Knob.getContents
   , setContents
 
   , newFileHandle
   , withFileHandle
+
+  , Device
+  , newDevice
   ) where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -92,6 +93,8 @@ withFileHandle :: MonadIO m
                -> IO.IOMode -> (IO.Handle -> IO a) -> m a
 withFileHandle knob name mode io = liftIO (bracket (newFileHandle knob name mode) IO.hClose io)
 
+-- | An IO device backed by a 'Knob'. You shouldn't usually use this type directly;
+-- use 'newFileHandle' or 'withFileHandle' instead.
 data Device = Device IO.IOMode (MVar.MVar ByteString) (MVar.MVar Int)
   deriving (Typeable)
 
