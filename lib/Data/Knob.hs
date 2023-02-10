@@ -31,6 +31,9 @@ module Data.Knob
 
   , newFileHandle
   , withFileHandle
+
+  , Device
+  , newDevice
   ) where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -48,6 +51,7 @@ import qualified GHC.IO.Device as IO
 import qualified GHC.IO.Exception as IO
 import qualified GHC.IO.Handle as IO
 import qualified System.IO as IO
+import Data.Maybe (fromMaybe)
 
 -- | A knob is a basic virtual file, which contains a byte buffer. A knob can
 -- have multiple 'IO.Handle's open to it, each of which behaves like a standard
@@ -57,8 +61,50 @@ import qualified System.IO as IO
 -- byte buffer.
 newtype Knob = Knob (MVar.MVar ByteString)
 
+checkOffset :: Integer -> IO ()
+checkOffset off = when (toInteger (maxBound :: Int) < off) (throwIO err) where
+  err = IO.IOError Nothing IO.InvalidArgument "" "offset > (maxBound :: Int)" Nothing Nothing
+
+newKnob :: MonadIO m => ByteString -> m Knob
+newKnob bytes = do
+  var <- liftIO (MVar.newMVar bytes)
+  return (Knob var)
+
+getContents :: MonadIO m => Knob -> m ByteString
+getContents (Knob var) = liftIO (MVar.readMVar var)
+
+setContents :: MonadIO m => Knob -> ByteString -> m ()
+setContents (Knob var) bytes = liftIO (MVar.modifyMVar_ var (\_ -> return bytes))
+
+-- | Create a new 'IO.Handle' pointing to a 'Knob'. This handle behaves like
+-- a file-backed handle for most purposes.
+newFileHandle :: MonadIO m
+              => Knob
+              -> String -- ^ Filename shown in error messages
+              -> IO.IOMode -> m IO.Handle
+newFileHandle knob name mode = liftIO $ do
+  device <- newDevice knob mode
+  IO.mkFileHandle device name mode Nothing IO.noNewlineTranslation
+
+-- | See 'newFileHandle'.
+withFileHandle :: MonadIO m
+               => Knob
+               -> String -- ^ Filename shown in error messages.
+               -> IO.IOMode -> (IO.Handle -> IO a) -> m a
+withFileHandle knob name mode io = liftIO (bracket (newFileHandle knob name mode) IO.hClose io)
+
+-- | An IO device backed by a 'Knob'. You shouldn't usually use this type directly;
+-- use 'newFileHandle' or 'withFileHandle' instead.
 data Device = Device IO.IOMode (MVar.MVar ByteString) (MVar.MVar Int)
   deriving (Typeable)
+
+newDevice :: MonadIO m => Knob -> IO.IOMode -> m Device
+newDevice (Knob var) mode = liftIO $ do
+  startPosition <- MVar.withMVar var $ \bytes -> return $ case mode of
+    IO.AppendMode -> Data.ByteString.length bytes
+    _ -> 0
+  posVar <- MVar.newMVar startPosition
+  pure $ Device mode var posVar
 
 instance IO.IODevice Device where
   ready _ _ _ = return True
@@ -87,12 +133,8 @@ instance IO.IODevice Device where
   getSize (Device _ var _) = do
     bytes <- MVar.readMVar var
     return (toInteger (Data.ByteString.length bytes))
-  setSize dev size = setDeviceSize dev size
+  setSize = setDeviceSize
   devType _ = return IO.RegularFile
-
-checkOffset :: Integer -> IO ()
-checkOffset off = when (toInteger (maxBound :: Int) < off) (throwIO err) where
-  err = IO.IOError Nothing IO.InvalidArgument "" "offset > (maxBound :: Int)" Nothing Nothing
 
 setDeviceSize :: Device -> Integer -> IO ()
 setDeviceSize (Device mode bytes_var _) size = checkSize >> setBytes where
@@ -146,7 +188,7 @@ instance IO.BufferedIO Device where
 
   fillReadBuffer dev buf = do
     (numRead, newBuf) <- IO.fillReadBuffer0 dev buf
-    return (maybe 0 id numRead, newBuf)
+    return (fromMaybe 0 numRead, newBuf)
 
   fillReadBuffer0 (Device _ bytes_var pos_var) buf = do
     MVar.withMVar bytes_var $ \bytes -> do
@@ -177,34 +219,3 @@ instance IO.BufferedIO Device where
   flushWriteBuffer0 dev buf = do
     newBuf <- IO.flushWriteBuffer dev buf
     return (IO.bufR buf - IO.bufL buf, newBuf)
-
-newKnob :: MonadIO m => ByteString -> m Knob
-newKnob bytes = do
-  var <- liftIO (MVar.newMVar bytes)
-  return (Knob var)
-
-getContents :: MonadIO m => Knob -> m ByteString
-getContents (Knob var) = liftIO (MVar.readMVar var)
-
-setContents :: MonadIO m => Knob -> ByteString -> m ()
-setContents (Knob var) bytes = liftIO (MVar.modifyMVar_ var (\_ -> return bytes))
-
--- | Create a new 'IO.Handle' pointing to a 'Knob'. This handle behaves like
--- a file-backed handle for most purposes.
-newFileHandle :: MonadIO m
-              => Knob
-              -> String -- ^ Filename shown in error messages
-              -> IO.IOMode -> m IO.Handle
-newFileHandle (Knob var) name mode = liftIO $ do
-  startPosition <- MVar.withMVar var $ \bytes -> return $ case mode of
-    IO.AppendMode -> Data.ByteString.length bytes
-    _ -> 0
-  posVar <- MVar.newMVar startPosition
-  IO.mkFileHandle (Device mode var posVar) name mode Nothing IO.noNewlineTranslation
-
--- | See 'newFileHandle'.
-withFileHandle :: MonadIO m
-               => Knob
-               -> String -- ^ Filename shown in error messages.
-               -> IO.IOMode -> (IO.Handle -> IO a) -> m a
-withFileHandle knob name mode io = liftIO (bracket (newFileHandle knob name mode) IO.hClose io)
